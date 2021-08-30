@@ -13,8 +13,9 @@ pub struct Snapshot {
     #[br(temp)]
     l1_entry_count: u32,
 
+    /// Table of L1 entries in the screenshot
     #[br(restore_position, seek_before = SeekFrom::Start(l1_table_offset), count = l1_entry_count)]
-    l1_table: Vec<L1Entry>,
+    pub l1_table: Vec<L1Entry>,
 
     /// Length of the unique ID string describing the snapshot
     #[br(temp)]
@@ -65,16 +66,16 @@ pub struct SnapshotExtraData {
     /// Size of the VM state in bytes. 0 if no VM state is saved. If this field is present,
     /// the 32-bit value in Snapshot.vm_state_size is ignored.
     #[br(if(size >= 8))]
-    vm_state_size: u64,
+    pub vm_state_size: u64,
 
     /// Virtual disk size of the snapshot in bytes
     #[br(if(size >= 16))]
-    virtual_disk_size: Option<u64>,
+    pub virtual_disk_size: Option<u64>,
 
     /// icount value which corresponds to the record/replay instruction count when the snapshot was
     /// taken. Set to -1 if icount was disabled
     #[br(if(size >= 24))]
-    instruction_count: Option<i64>,
+    pub instruction_count: Option<i64>,
 }
 
 /// Represents the time a snapshot was taken in the form of seconds, nanoseconds. The nanoseconds
