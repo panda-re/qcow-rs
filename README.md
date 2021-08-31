@@ -74,9 +74,15 @@ SUBCOMMANDS:
     tree          Display a tree listing of the contents of the qcow
 ```
 
+### Install
+
+```
+cargo install qcow-cli
+```
+
 ### Screenshots
 
 ![info command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/info.png?raw=true)
 ![tree command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/tree.png?raw=true)
-![partitions command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/ ./cli/screenshots/partitions.png?raw=true)
+![partitions command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/partitions.png?raw=true)
 ![get-file command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/get-file.png?raw=true)
