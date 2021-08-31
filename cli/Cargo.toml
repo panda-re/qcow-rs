@@ -1,0 +1,24 @@
+[package]
+name = "qcow-cli"
+version = "0.1.0"
+edition = "2018"
+
+[[bin]]
+name = "qcow"
+path = "src/main.rs"
+
+[dependencies]
+qcow = "1.1"
+bootsector = "0.1.5"
+humansize = "1.1.1"
+gpt-partition-type = "0.1"
+ext4 = "0.9"
+positioned-io = "0.2"
+tabled = { version = "0.2.2", features = ["color"] }
+owo-colors = "2.0.0"
+bat = "0.18.2"
+syntect = "4.5.0"
+atty = "0.2.14"
+structopt = "0.3.22"
+chrono = "0.4.19"
+libc = "0.2.98"

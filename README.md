@@ -33,7 +33,7 @@ let mut buf = [0; 10];
 reader.read_exact(&mut buf)?;
 ```
 
-## Features
+## Library Features
 
 * Parse qcow files
 * Full qcow version 1 support
@@ -47,3 +47,36 @@ reader.read_exact(&mut buf)?;
     * Includes compression support (for both zlib and zstd)
     * Cluster lookup caching, backtracking on cache miss
     * Allows arbitrary seeking within the guest
+
+## Command Line Interface
+
+Also present is a cli for interfacing with qcows.
+
+```
+qcow-cli 0.1.0
+A utility for querying information about qcow files
+
+USAGE:
+    qcow <qcow> <SUBCOMMAND>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+ARGS:
+    <qcow>
+
+SUBCOMMANDS:
+    get-file      Output a file within the qcow to stdout
+    help          Prints this message or the help of the given subcommand(s)
+    info          Output info about the given qcow
+    partitions    Display a list of partitions in the qcow image
+    tree          Display a tree listing of the contents of the qcow
+```
+
+### Screenshots
+
+![info command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/info.png?raw=true)
+![tree command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/tree.png?raw=true)
+![partitions command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/ ./cli/screenshots/partitions.png?raw=true)
+![get-file command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/get-file.png?raw=true)
