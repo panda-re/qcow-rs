@@ -2,6 +2,13 @@
 name = "qcow-cli"
 version = "0.1.0"
 edition = "2018"
+authors = ["Jordan McLeod <Jordan.McLeod@ll.mit.edu>"]
+description = "A CLI for working with qemu qcow files"
+homepage = "https://panda.re"
+repository = "https://github.com/panda-re/qcow-rs"
+license = "MIT"
+keywords = ["qemu", "qcow", "qcow2", "disk", "image"]
+category = "emulators"
 
 [[bin]]
 name = "qcow"
