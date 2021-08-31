@@ -82,7 +82,18 @@ cargo install qcow-cli
 
 ### Screenshots
 
+Listing info about the qcow:
+
 ![info command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/info.png?raw=true)
+
+Viewing the file tree:
+
 ![tree command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/tree.png?raw=true)
+
+Viewing the image partitions:
+
 ![partitions command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/partitions.png?raw=true)
+
+Extracting or viewing a file using get-file:
+
 ![get-file command](https://raw.githubusercontent.com/panda-re/qcow-rs/master/cli/screenshots/get-file.png?raw=true)
