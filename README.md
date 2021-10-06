@@ -47,13 +47,14 @@ reader.read_exact(&mut buf)?;
     * Includes compression support (for both zlib and zstd)
     * Cluster lookup caching, backtracking on cache miss
     * Allows arbitrary seeking within the guest
+  * Supports 'recursive' qcows which have another qcow on-disk as a backing file store
 
 ## Command Line Interface
 
 Also present is a cli for interfacing with qcows.
 
 ```
-qcow-cli 0.1.0
+qcow-cli 0.2.0
 A utility for querying information about qcow files
 
 USAGE:
