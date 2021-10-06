@@ -20,11 +20,26 @@ pub enum SubCommand {
         #[structopt(default_value = "/")]
         dir: String,
 
-        #[structopt(long, help = "The number of files to show per directory", default_value = "10")]
+        #[structopt(
+            long,
+            help = "The number of files to show per directory",
+            default_value = "10"
+        )]
         file_limit: usize,
-        
-        #[structopt(short, long, help = "The maximum number of times to recurse", default_value = "16")]
+
+        #[structopt(long, help = "Don't limit the number of files to show per directory")]
+        no_file_limit: bool,
+
+        #[structopt(
+            short,
+            long,
+            help = "The maximum number of times to recurse directories",
+            default_value = "16"
+        )]
         depth_limit: usize,
+
+        #[structopt(long, help = "Don't limit the number of directories to recurse")]
+        no_depth_limit: bool,
     },
 
     #[structopt(about = "Display a list of partitions in the qcow image")]
@@ -37,8 +52,12 @@ pub enum SubCommand {
 
         #[structopt(long, help = "Disable using less as a pager")]
         no_page: bool,
-        
-        #[structopt(short = "-ff", long, help = "Force fancy output even while piping to another program")]
+
+        #[structopt(
+            short = "-ff",
+            long,
+            help = "Force fancy output even while piping to another program"
+        )]
         force_fancy: bool,
 
         #[structopt(short, long, help = "Language to syntax highlight as")]
