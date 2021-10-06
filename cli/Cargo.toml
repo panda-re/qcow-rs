@@ -1,6 +1,6 @@
 [package]
 name = "qcow-cli"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2018"
 authors = ["Jordan McLeod <Jordan.McLeod@ll.mit.edu>"]
 description = "A CLI for working with qemu qcow files"
@@ -15,7 +15,7 @@ name = "qcow"
 path = "src/main.rs"
 
 [dependencies]
-qcow = "1.1"
+qcow = { path = "..", version = "1.1" }
 bootsector = "0.1.5"
 humansize = "1.1.1"
 gpt-partition-type = "0.1"

@@ -32,7 +32,7 @@
 //!
 //! ## Important types/functions
 //!
-//! * Retrieving a qcow - [`open`] (from path), [`load`] (from reader), [`load_from_memory`] (from 
+//! * Retrieving a qcow - [`open`] (from path), [`load`] (from reader), [`load_from_memory`] (from
 //! slice)
 //! * Converting to qcow2 - [`DynamicQcow::unwrap_qcow2`]
 //! * Reading from a virtual hard disk - [`Qcow2::reader`] (returns [`Reader`], which implements
@@ -54,14 +54,15 @@
 //!     * Allows arbitrary seeking within the guest
 #![warn(missing_docs)]
 use binread::{
-    derive_binread, BinRead, io::{Read, Seek, SeekFrom},
-    ReadOptions, BinResult, BinReaderExt, until_exclusive
+    derive_binread,
+    io::{Read, Seek, SeekFrom},
+    until_exclusive, BinRead, BinReaderExt, BinResult, ReadOptions,
 };
 use modular_bitfield::prelude::*;
 
 use std::fs::File;
-use std::path::Path;
 use std::io::{BufReader, Cursor};
+use std::path::Path;
 
 mod methods;
 mod reader;
@@ -133,7 +134,7 @@ pub struct Qcow1 {
 
 #[derive(BinRead, Debug)]
 #[br(big, magic = b"QFI\xfb")]
-struct QcowVersion(u32); 
+struct QcowVersion(u32);
 
 /// Open a qcow or qcow2 file from a path
 ///
@@ -174,7 +175,8 @@ pub fn load(reader: &mut (impl Read + Seek)) -> Result<DynamicQcow, Error> {
         reader.read_be().map(DynamicQcow::Qcow1)
     } else {
         reader.read_be().map(DynamicQcow::Qcow2)
-    }.map_err(Error::from)
+    }
+    .map_err(Error::from)
 }
 
 /// Read a qcow or qcow2 file from a slice

@@ -1,8 +1,11 @@
-use crate::*;
 use crate::levels::{L1Entry, L2Entry};
+use crate::*;
 
-use std::io::{self, Read, Seek};
 use std::convert::TryInto;
+use std::fs::File;
+use std::io::{self, BufReader, Read, Seek};
+
+type BackingReader = Reader<'static, 'static, BufReader<File>>;
 
 /// A reader for reading from the guest virtual drive. Should be constructed using
 /// [`Qcow2::reader`].
@@ -24,9 +27,12 @@ use std::convert::TryInto;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct Reader<'qcow, 'reader, R>
-where R: Read + Seek,
+where
+    R: Read + Seek,
 {
     qcow: &'qcow Qcow2,
+
+    backing_reader: Option<Box<BackingReader>>,
 
     /// inner reader used for reading/seeking in the host file (the qcow itself)
     reader: &'reader mut R,
@@ -72,15 +78,20 @@ impl Qcow2 {
     ///
     /// **Note:** if `reader` is not identical to the source file unexpected things will happen.
     pub fn reader<'qcow, 'reader, R>(
-        &'qcow self, reader: &'reader mut R
+        &'qcow self,
+        reader: &'reader mut R,
     ) -> Reader<'qcow, 'reader, R>
-        where R: Read + Seek,
+    where
+        R: Read + Seek,
     {
         let pos = 0;
         let l1_key = 0;
         let l2_key = 0;
         let qcow = self;
-        let l1_cache = self.l1_table.get(l1_key as usize).expect("No L1 table entries found");
+        let l1_cache = self
+            .l1_table
+            .get(l1_key as usize)
+            .expect("No L1 table entries found");
         let l2_table_cache = l1_cache
             .read_l2(reader, qcow.header.cluster_bits)
             .expect("No L2 table found");
@@ -90,29 +101,70 @@ impl Qcow2 {
             .clone();
 
         let mut current_cluster = vec![0; self.cluster_size() as usize].into_boxed_slice();
-        l2_cache.read_contents(
-            reader,
-            &mut current_cluster[..],
-            qcow.header
-                .v3_header
-                .as_ref()
-                .map(|hdr| hdr.compression_type)
-                .unwrap_or_default()
-        ).expect("Failed to read first qcow cluster");
+        l2_cache
+            .read_contents(
+                reader,
+                &mut current_cluster[..],
+                qcow.header
+                    .v3_header
+                    .as_ref()
+                    .map(|hdr| hdr.compression_type)
+                    .unwrap_or_default(),
+            )
+            .or_else(|err| {
+                if self
+                    .header
+                    .backing_file
+                    .as_deref()
+                    .map(|path| Path::new(path).exists())
+                    .unwrap_or(false)
+                {
+                    Ok(())
+                } else {
+                    Err(err)
+                }
+            })
+            .expect("Failed to read first qcow cluster");
 
         Reader {
-            qcow, reader, pos, l1_cache, l2_table_cache,
-            l2_cache, l1_key, l2_key, current_cluster
+            qcow,
+            reader,
+            pos,
+            l1_cache,
+            l2_table_cache,
+            l2_cache,
+            l1_key,
+            l2_key,
+            current_cluster,
+            backing_reader: None,
         }
     }
 }
 
 impl<'qcow, 'reader, R> Reader<'qcow, 'reader, R>
-    where R: Read + Seek,
+where
+    R: Read + Seek,
 {
     /// Returns the current read position within the guest virtual hard disk
     pub fn guest_pos(&self) -> u64 {
         self.pos
+    }
+
+    /// Returns a reference to a reader for the backing qcow file, if such a backing file exists.
+    pub fn get_backing_qcow_reader(&mut self) -> Option<&mut BackingReader> {
+        if self.backing_reader.is_none() {
+            let backing_file = self.qcow.header.backing_file.as_deref()?;
+
+            // leaking because nobody will open more than 3 in a single run, which is still only a
+            // couple KB of memory.
+            let file = Box::leak(Box::new(BufReader::new(File::open(backing_file).ok()?)));
+            let qcow = Box::leak(Box::new(crate::load(file).ok()?.unwrap_qcow2()));
+            self.backing_reader = Some(Box::new(qcow.reader(file)));
+
+            println!("Successfully created backing reader");
+        }
+
+        self.backing_reader.as_deref_mut()
     }
 
     fn update_l1_cache(&mut self) -> io::Result<()> {
@@ -121,19 +173,19 @@ impl<'qcow, 'reader, R> Reader<'qcow, 'reader, R>
 
         if self.l1_key != l1_key {
             self.l1_key = l1_key;
-            self.l1_cache = self.qcow.l1_table
-                .get(l1_key as usize)
-                .ok_or_else(|| io::Error::new(
+            self.l1_cache = self.qcow.l1_table.get(l1_key as usize).ok_or_else(|| {
+                io::Error::new(
                     io::ErrorKind::UnexpectedEof,
-                    "Read position past end of virtual disk"
-                ))?;
+                    "Read position past end of virtual disk",
+                )
+            })?;
 
-            self.l2_table_cache = self.l1_cache
+            self.l2_table_cache = self
+                .l1_cache
                 .read_l2(self.reader, self.qcow.header.cluster_bits)
-                .ok_or_else(|| io::Error::new(
-                    io::ErrorKind::UnexpectedEof,
-                    "L2 table could not be read"
-                ))?;
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::UnexpectedEof, "L2 table could not be read")
+                })?;
         }
 
         Ok(())
@@ -154,17 +206,25 @@ impl<'qcow, 'reader, R> Reader<'qcow, 'reader, R>
         }
 
         if self.l1_cache.l2_offset == 0 {
-            // empty cluster
-            self.current_cluster.fill(0);
+            if self.qcow.header.backing_file.is_some() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "l2_offset == 0, backing file expected",
+                ));
+            } else {
+                // empty cluster?
+                self.current_cluster.fill(0);
+            }
         } else {
             self.l2_cache.read_contents(
                 self.reader,
                 &mut self.current_cluster[..],
-                self.qcow.header
+                self.qcow
+                    .header
                     .v3_header
                     .as_ref()
                     .map(|hdr| hdr.compression_type)
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
             )?;
         }
 
@@ -183,57 +243,83 @@ impl<'qcow, 'reader, R> Reader<'qcow, 'reader, R>
 }
 
 impl<'qcow, 'reader, R> Read for Reader<'qcow, 'reader, R>
-    where R: Read + Seek,
+where
+    R: Read + Seek,
 {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.update_l2_cache()?;
+        match self.update_l2_cache() {
+            Ok(()) => {
+                let cluster_size = self.cluster_size();
+                let pos_in_cluster = self.pos % cluster_size;
+                let bytes_remaining_in_cluster = cluster_size - pos_in_cluster;
 
-        let cluster_size = self.cluster_size();
-        let pos_in_cluster = self.pos % cluster_size;
-        let bytes_remaining_in_cluster = cluster_size - pos_in_cluster;
+                let read_len = u64::min(bytes_remaining_in_cluster, buf.len() as u64);
+                let read_end: usize = (pos_in_cluster + read_len).try_into().unwrap();
+                let pos_in_cluster: usize = pos_in_cluster.try_into().unwrap();
 
+                buf[..read_len as usize]
+                    .copy_from_slice(&self.current_cluster[pos_in_cluster..read_end]);
 
-        let read_len = u64::min(bytes_remaining_in_cluster, buf.len() as u64);
-        let read_end: usize = (pos_in_cluster + read_len).try_into().unwrap();
-        let pos_in_cluster: usize = pos_in_cluster.try_into().unwrap();
-        
-        buf[..read_len as usize].copy_from_slice(&self.current_cluster[pos_in_cluster..read_end]);
+                self.pos += read_len;
+                let _ = self.update_l2_cache();
 
-        self.pos += read_len;
-        let _ = self.update_l2_cache();
+                Ok(read_len as usize)
+            }
+            Err(err) => (move || {
+                let pos = self.pos;
+                let reader = self.get_backing_qcow_reader()?;
 
-        Ok(read_len as usize)
+                reader.seek(SeekFrom::Start(pos)).ok()?;
+                let bytes_read = reader.read(buf).ok()?;
+
+                self.pos += bytes_read as u64;
+
+                Some(bytes_read)
+            })()
+            .ok_or(err),
+        }
     }
 }
 
 impl<'qcow, 'reader, R> Seek for Reader<'qcow, 'reader, R>
-    where R: Read + Seek,
+where
+    R: Read + Seek,
 {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         match pos {
             SeekFrom::Start(new_pos) => self.pos = new_pos,
             SeekFrom::Current(rel_offset) => {
-                self.pos = self.pos.try_into()
+                self.pos = self
+                    .pos
+                    .try_into()
                     .map(|pos: i64| pos + rel_offset)
                     .unwrap_or_else(|_| {
-                        ((self.pos as i128) + (rel_offset as i128)).try_into().unwrap()
+                        ((self.pos as i128) + (rel_offset as i128))
+                            .try_into()
+                            .unwrap()
                     })
                     .try_into()
-                    .map_err(|_| io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "seek out of range of 64-bit position"
-                    ))?;
-            },
+                    .map_err(|_| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "seek out of range of 64-bit position",
+                        )
+                    })?;
+            }
             SeekFrom::End(from_end) => {
                 self.pos = (from_end + (self.qcow.header.size as i64))
                     .try_into()
-                    .map_err(|_| io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "seek out of range of 64-bit position"
-                    ))?;
+                    .map_err(|_| {
+                        io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "seek out of range of 64-bit position",
+                        )
+                    })?;
             }
         }
 
-        self.update_l2_cache().map(|_| self.pos)
+        let _ = self.update_l2_cache();
+
+        Ok(self.pos)
     }
 }
