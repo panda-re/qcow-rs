@@ -24,7 +24,13 @@ pub fn main(args: Args) {
 
             let partition_reader = bootsector::open_partition(&mut reader, &partitons[0]).unwrap();
             let mut reader = ReadAtAdapter::new(partition_reader);
-            let $superblock = ext4::SuperBlock::new(&mut reader).unwrap();
+            let $superblock = ext4::SuperBlock::new_with_options(
+                &mut reader,
+                &ext4::Options {
+                    checksums: ext4::Checksums::Enabled,
+                },
+            )
+            .unwrap();
         };
     }
 
