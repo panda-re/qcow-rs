@@ -28,7 +28,10 @@ pub fn output_partitions(reader: &mut (impl Read + Seek)) {
                         os: "Unknown",
                         type_description: "Unknown",
                     }),
-                Attributes::MBR { .. } => panic!("MBR is unsupported"),
+                Attributes::MBR { .. } => PartitionDescription {
+                    os: "Unknown",
+                    type_description: "MBR Partition",
+                },
             };
 
             TableEntry {
