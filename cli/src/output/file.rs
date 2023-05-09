@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use super::*;
 
 pub struct FileCfg {
@@ -25,7 +27,7 @@ pub fn output_file<R: ReadAt>(superblock: &ext4::SuperBlock<R>, path: &str, cfg:
             first_line_match: syntax.first_line_match.clone(),
             hidden: syntax.hidden,
             variables: syntax.variables.clone(),
-            contexts: Default::default()
+            contexts: Default::default(),
         });
     }
     syntax_set.add_plain_text_syntax();
@@ -35,29 +37,36 @@ pub fn output_file<R: ReadAt>(superblock: &ext4::SuperBlock<R>, path: &str, cfg:
     let syntax = syntax_set
         .find_syntax_by_path(path)
         .or_else(|| syntax_set.find_syntax_by_first_line(&String::from_utf8_lossy(&buf)))
-        .or_else(|| if path.ends_with("vimrc") {
-            Some(syntax_set.find_syntax_by_name("VimL").unwrap())
-        } else {
-            None
+        .or_else(|| {
+            if path.ends_with("vimrc") {
+                Some(syntax_set.find_syntax_by_name("VimL").unwrap())
+            } else {
+                None
+            }
         })
         .unwrap_or_else(|| syntax_set.find_syntax_plain_text())
         .name
         .clone();
 
+    let is_binary = std::str::from_utf8(&buf).is_err();
     let if_is_tty = atty::is(atty::Stream::Stdout) || cfg.force_fancy;
 
-    bat::PrettyPrinter::new()
-        .input(bat::Input::from_bytes(&buf).title(path))
-        .language(cfg.language.as_ref().unwrap_or(&syntax))
-        .colored_output(if_is_tty)
-        .line_numbers(if_is_tty)
-        .grid(if_is_tty)
-        .header(if_is_tty)
-        .paging_mode(if cfg.no_page {
-            bat::PagingMode::Never
-        } else {
-            bat::PagingMode::QuitIfOneScreen
-        })
-        .print()
-        .unwrap();
+    if if_is_tty && !is_binary {
+        bat::PrettyPrinter::new()
+            .input(bat::Input::from_bytes(&buf).title(path))
+            .language(cfg.language.as_ref().unwrap_or(&syntax))
+            .colored_output(true)
+            .line_numbers(true)
+            .grid(true)
+            .header(true)
+            .paging_mode(if cfg.no_page {
+                bat::PagingMode::Never
+            } else {
+                bat::PagingMode::QuitIfOneScreen
+            })
+            .print()
+            .unwrap();
+    } else {
+        std::io::stdout().lock().write_all(&buf).unwrap();
+    }
 }
